@@ -1,0 +1,68 @@
+#!/bin/bash
+parentDir=$( dirname -- "$( readlink -f -- "$0"; )"; )
+red=$(tput setaf 1)
+blue=$(tput setaf 4)
+reset_text="\033[0m"
+date=$(date -I)
+robotstxt=on
+usage="Usage: $0 [-h] [-r] [-d <int [0-5]>] [-x <domain1,domain2...>] [-o <output-folder>] URL(s) -- I'll download webpages (and their required site files) to a specified location.
+Flags:
+    -h  display help
+    -d  set depth (how many links away from the URL I should download)
+    -o  set an output directory
+    -r  disables compliance with robots.txt
+    -x  specify domain(s) to allow content downloads for (e.g example.com would allow downloads from www.example.com, images.example.com, etc.)"
+
+while getopts ":hd:o:x:r" flag
+do
+    case "${flag}" in
+        h)
+        cat ${parentDir}/help.sixel
+        echo -e "${red}You need some help? No problem.${reset_text}\n"
+        echo "$usage"
+        exit 0;;
+        d) depth=${OPTARG};;
+        o) output=${OPTARG};;
+        r) robotstxt=off;;
+        x) domains="-H -D${OPTARG}";;
+    esac
+done
+shift $((OPTIND -1))
+
+if [[ $# -eq 0 ]]; then
+    cat ${parentDir}/fail.sixel
+    echo -e "${red}You haven't provided any arguments... You've got to tell me the url(s) so I can download the files...${reset_text}\n"
+    echo -e "${red}Use the -h flag if you need me to help.${reset_text}"
+    exit 2
+fi
+
+if [[ -z "$output" ]]; then
+    output="."
+fi
+
+if [[ -n "$depth" ]]; then
+    if [[ $depth -lt 6 && $depth -ge 0 ]]; then
+        echo "Performing download with depth: ${depth} into ${output}/${date}"
+        wget ${domains} -e robots=$robotstxt -N -E -k -r -l "${depth}" -p -P "${output}/${date}" "$@" \
+            && cat ${parentDir}/ok.sixel \
+            && echo -e "${blue}Finished downloading your files! Seems my job here is done~${reset_text}" \
+            && exit 0
+
+        cat ${parentDir}/error.sixel
+        echo -e "${red}Uuh... sorry, I think something went wrong...${reset_text}"
+        exit 1
+    fi
+
+    cat ${parentDir}/fail.sixel
+    echo -e "${red}You need to provide a number between 0-5 for depth...${reset_text}"
+    exit 2
+fi
+
+echo "Performing download into ${output}/${date}"
+wget -N -E -k -p ${domains} -e robots=$robotstxt -P "${output}/${date}" "$@" \
+    && cat ${parentDir}/ok.sixel \
+    && echo -e "${blue}Finished downloading your files! Seems my job here is done~${reset_text}" \
+    && exit 0
+cat ${parentDir}/error.sixel
+echo -e "${red}Uuh... sorry, I think something went wrong...${reset_text}"
+exit 1
